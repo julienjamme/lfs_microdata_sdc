@@ -64,5 +64,42 @@ lfs_micro_arm_2020 %>%
   group_by(empj, emsj, iempj, iemsj, LU1_unemployed, LU2_combined_nomin, long_unemployed) %>%
   count()
 
-# Sensitive variables : arm => maybe E15 (income); fr => none
+# Diploma: arm => B7; fr => DIP11
+lfs_micro_arm_2020 %>%
+  group_by(B7) %>%
+  count()
+
+lfs_micro_fr_2020 %>%
+  group_by(DIP11) %>%
+  count()
+
+#10: Bachelor's degree or higher
+#11: Schools at Bachelor's degree level (example : Ingeneering schools)
+#30: First two years at univeristy (Highschool +2)
+#31: Diploma of superior technician (Highschool + 2)
+#33: Paramedical or social diploma (Highschool +2) 
+#41: Bachelor (diploma at the end of highschool)
+#42: Technological/Professionnal Bachelor
+#50: Certificate of professional competence (CAP + BEP)
+#60: Basic
+#70: Primary
+#71: No diploma
+
+# Potential Sensitive variables :
+# arm => maybe E15 (income), C2 (nationality);
+# fr => nationality (NFRRED);
+lfs_micro_arm_2020 %>%
+  group_by(E15) %>%
+  count()
+
+lfs_micro_arm_2020 %>%
+  group_by(C2) %>%
+  count()
+
+lfs_micro_fr_2020 %>%
+  group_by(NFRRED) %>%
+  count()
+#NFRRED : 1 = French by birth; 2 = French by acquisition; 3 = foreigner
+
+
 
