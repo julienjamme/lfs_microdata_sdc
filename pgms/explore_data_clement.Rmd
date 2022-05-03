@@ -1,4 +1,4 @@
-```{r}
+---
 title: "Data exploration of LFS armenian data"
 author: "MS4"
 date: "`r Sys.Date()`"
@@ -8,10 +8,26 @@ output:
     highlight: github
     toc: true
     toc_depth: 5
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo = FALSE}
+packs <- c("xlsx","haven","dplyr","ggraph","igraph","tidyr","tidygraph","visNetwork","stringr","data.table","flextable","magrittr","gridExtra","sdcMicro")
+
+p <- sapply(packs, install.packages)
+p <- lapply(packs,function(p) suppressPackageStartupMessages(library(p,character.only = TRUE)))
+rm(p)
+# rm(list=ls())
 ```
 
 
 ```{r}
+lfs_micro_arm_2020 %>% head()
 
-
+lfs_micro_arm_2020 %>% group_by(A3) %>% count()
+lfs_micro_arm_2020 %>% group_by(A3) %>% count()
 ```
