@@ -1,5 +1,5 @@
 # Assessing disclosure risk of lfs microdata
-library(sdcMicro)
+# library(sdcMicro)
 library(dplyr)
 
 #french public file
@@ -22,6 +22,27 @@ dim(lfs_micro_fr_2020) #319398 records and 124 variables
 # Variables 
 colnames(lfs_micro_arm_2020)
 colnames(lfs_micro_fr_2020)
+
+# Counts:
+#Individuals (sampled)
+lfs_micro_arm_2020 %>%
+  count()
+#(population)
+lfs_micro_arm_2020 %>%
+  count(wt = WeightsCalib_year)
+
+#IDmem : identify the member of the household
+lfs_micro_arm_2020 %>%
+  select(IDmem) %>%
+  unique() %>%
+  nrow()
+
+# Questionnaires
+lfs_micro_arm_2020 %>%
+  select(A1) %>%
+  unique() %>%
+  nrow()
+
 
 # Presence of identifiers: No
 
@@ -100,6 +121,20 @@ lfs_micro_fr_2020 %>%
   group_by(NFRRED) %>%
   count()
 #NFRRED : 1 = French by birth; 2 = French by acquisition; 3 = foreigner
+
+
+# Conclusion:
+
+#1- No identifiers in the tables
+#2- Quasi-identifying variables (key variables) :
+# arm => AGE, SEXE, Geographical Area (Marz), Marital Status, Diploma
+# fr => AGE, SEXE, Geographical area, Type of Household, Diploma
+#3- Potential Sensitive variables 
+# arm => income, nationality, unemployment
+# fr => nationality, unemployment
+
+
+
 
 
 
