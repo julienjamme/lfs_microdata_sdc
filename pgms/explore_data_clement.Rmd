@@ -1,0 +1,17 @@
+```{r}
+title: "Data exploration of LFS armenian data"
+author: "MS4"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: tactile #cayman
+    highlight: github
+    toc: true
+    toc_depth: 5
+```
+
+
+```{r}
+
+
+```
