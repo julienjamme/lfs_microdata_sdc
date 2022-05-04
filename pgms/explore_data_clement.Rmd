@@ -24,10 +24,72 @@ rm(p)
 # rm(list=ls())
 ```
 
+Build houshold ID :
 
 ```{r}
-lfs_micro_arm_2020 %>% head()
 
-lfs_micro_arm_2020 %>% group_by(A3) %>% count()
-lfs_micro_arm_2020 %>% group_by(A3) %>% count()
+lfs_micro_arm_2020 <-
+  lfs_micro_arm_2020 %>% 
+  mutate(
+    id_hh = substr(IDmem,1,nchar(IDmem)-2), # concatenation of month + questionnaire_num
+    id_indiv = substr(IDmem,nchar(IDmem)-1,nchar(IDmem))
+  ) 
+
+
 ```
+
+
+Ok au final on a pas de réinterrogation de ménages contrairement à ce qui est préconisé par l'Europe.
+L'identifiant du ménage est constitué du mois (A6_Month) sur 2 positions et du numéro de questionnaire (649 questionnaires par mois (A1), 1 questionnaire = 1 ménage) et du numéro de l'individu dans le ménage.
+
+La LFS Arménie est un sondage à 2 degré, au premier degré on tire 708 énumérations area (EA) proportionnellemne tà leur taille parmi l'ensembledes EA :
+
+- On répartit ces 708 zones sur les 12 mois (59 * 12 mois) 
+- Puis on tire 11 ménages par zone par mois => 11 * 59 = 649 questionnaires
+
+Seule la représentativité trimestrielle et annuelle est garantie, pas meensuelle 
+
+Dans A2 on a le numéro du ménage dans l'enumeration area, (on tire 11 ménages par énumération Area) 
+16 enquêteurs seulement s'occupent de tout ça (40 questionnaires par mois)
+
+Au final 12*649 = 7788 ménages interrogés
+```{r}
+
+
+lfs_micro_arm_2020 %>% 
+  select(id_hh) %>% 
+  unique()
+  
+# n_EA by mars
+lfs_micro_arm_2020 %>% 
+  group_by(A6_Month,id_hh,A3) %>% 
+  summarise(A2 = unique(A2)) %>% 
+  ungroup() %>% 
+  group_by(A6_Month,A3) %>% 
+  summarise(n_EA = sum(A2==11)) %>% View()
+```
+
+
+
+```{r}
+
+# questionnaire info
+lfs_micro_arm_2020 %>% select(A1,A2,A3,A5,A6_Month,A6_Year,A7,A8) # 
+
+# respondant info
+lfs_micro_arm_2020 %>% select(all_of(c("B1","B3","B4","B5","B6","Age","B7","B8","B8_Year","B9","B10","B11","B12")))
+
+colnames(lfs_micro_arm_2020)
+
+```
+
+###To DO
+
+- Test PRAM sur des variables sensibles, de long en large -> En profiter pour les mesures de perte d'information
+- Regarder SUDA 
+- Test données synthétiques
+- Définition des variables sensibles
+- Définition des variables quasi-identifiantes dans les clefs
+- Test pram
+- Test données syntéthiques
+
