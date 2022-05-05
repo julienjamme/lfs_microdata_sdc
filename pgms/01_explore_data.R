@@ -43,6 +43,17 @@ lfs_micro_arm_2020 %>%
   unique() %>%
   nrow()
 
+# Number HH
+lfs_micro_arm_2020 %>%
+  select(A2) %>%
+  unique() %>%
+  nrow()
+
+# How identify members of a same household ?
+lfs_micro_arm_2020 %>%
+  filter(A1 == 649) %>%
+  select(IDmem, A1,A2,A6_Month,A7,A8, starts_with("Weights")) %>%
+  View()
 
 # Presence of identifiers: No
 
