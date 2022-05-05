@@ -7,7 +7,7 @@
 
 I. Introduction : a roadmap to release microdata file  
     
-    A. All the steps to follow  
+    A. Steps to follow  
         --TODO-- global scheme
     B. What to define before managing the data  
 
