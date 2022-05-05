@@ -54,11 +54,11 @@ IV. Audit of LFS armenian microdata file released on the web
 
 V. (Optional) Further SDC Methods
 
-VI. Questions
+VI. Further Questions and Debrief
 
 ## Schedule 
 
 First day - I and II
 Second day - morning III
-Second day - afternoon IV
-Third day - IV (maybe V in the afternoon)
+Second day - afternoon IV (start)
+Third day - IV (end) (maybe V in the afternoon) and VI
