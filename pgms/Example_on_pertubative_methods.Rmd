@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r, echo = FALSE}
-packs <- c("xlsx","dplyr","sdcMicro","archive")
+packs <- c("xlsx","dplyr","tidyr","sdcMicro","archive")
 
 p <- sapply(packs, install.packages)
 p <- lapply(packs,function(p) suppressPackageStartupMessages(library(p,character.only = TRUE)))
@@ -24,7 +24,7 @@ rm(p)
 # rm(list=ls())
 ```
 
-### Preparing data :
+### Prepare data :
 
 ```{r}
 
@@ -39,7 +39,7 @@ lfs_micro_arm_2020 <- haven::read_spss("data/LFS_2020_2020 Dataset_Residents.sav
 lfs_micro_arm_2020 <-
   lfs_micro_arm_2020 %>% 
   mutate(
-    id_hh = substr(IDmem,1,nchar(IDmem)-2), # concatenation of month + questionnaire_num
+    id_hh = as.numeric(substr(IDmem,1,nchar(IDmem)-2)), # concatenation of month + questionnaire_num
     id_indiv = substr(IDmem,nchar(IDmem)-1,nchar(IDmem))
   ) 
 
@@ -67,29 +67,179 @@ Sensitive variables
 ```{r}
 lfs_micro_subset <-
   lfs_micro_arm_2020 %>%
-  select(id_hh,id_indiv,B5,B6,B3,A3,B11,B7,E15,C2,LU1_unemployed) %>% 
+  select(id_hh,id_indiv,B5,B6,B3,A3,B11,B7,E15,C2,LU1_unemployed,WeightsCalib_year) %>% 
   mutate(
     dob = paste0(B5,"_",B6), # date of birth
-    LU1_unemployed = ifelse(is.na(LU1_unemployed),0,1) 
-         )
+    LU1_unemployed = as.factor(ifelse(is.na(LU1_unemployed),0,1)) 
+         ) %>% 
+  select(-B5,-B6)
 ```
 
-### Pram example :
 
-Prepare the sdc micro object
+### A simple way to apply PRAM
+
+```{r}
+pram_1 <- pram(
+  lfs_micro_subset,
+  variables = "LU1_unemployed"
+)
+
+str(pram_1,1) # It is not a sdc Micro object, list of variables xwith attributes
+
+attributes(pram_1)
+attr(pram_1,"summary")
+attr(pram_1,"pram_params")
+
+# build data based on the results
+data_pram <- 
+  do.call(cbind,pram_1) %>%
+  data.frame()
+
+# Original count
+data_pram %>% 
+  group_by(LU1_unemployed) %>% 
+  count()
+
+# the modify variable is suffixed by "_pram"
+data_pram %>% 
+  group_by(LU1_unemployed_pram) %>% 
+  count()
+
+data_pram %>% 
+  group_by(LU1_unemployed,LU1_unemployed_pram) %>% 
+  count() %>% 
+  ungroup() %>% 
+  pivot_wider(
+    names_from = LU1_unemployed_pram,
+    values_from = n
+    )
+```
+
+### Define the pram parameters  
+
 ```{r}
 
 
 
 ```
 
-###To DO
+### How to perform stratification ?
 
-- Test PRAM sur des variables sensibles, de long en large -> En profiter pour les mesures de perte d'information
+regarder si on peut mettre 2 matrices différentes pour ces sous groupes ...
+```{r}
+res_strata <- pram(
+  obj = lfs_micro_subset,
+  variables = "LU1_unemployed",
+  strata_variables = c("B3")
+  )
+
+?pram
+
+attr(res_strata,"pram_params")
+```
+
+### How to measure the information loss ?
+```{r}
+
+
+```
+
+
+
+### Applying PRAM on a SDC_micro_obj 
+
+Prepare the sdc micro object
+```{r}
+selectedKeyVars = c('dob','A3','B3','B7','B11')
+
+# weight variable
+selectedWeightVar = c('WeightsCalib_year')
+
+# selected pram variables
+selectedPramVars = c('LU1_unemployed')
+
+# household id variable (cluster)
+selectedHouseholdID = c('id_hh')
+
+sdcInitial <- createSdcObj(
+  dat = lfs_micro_subset,
+  keyVars     = selectedKeyVars,
+  weightVar   = selectedWeightVar,
+  pramVars    = selectedPramVars,
+  hhId        = selectedHouseholdID,
+  seed = 12345
+)
+
+str(sdcInitial,2)
+```
+
+```{r}
+
+pram_2  <- pram(sdcInitial,variables = NULL,strata_variables = NULL)
+str(pram_2,1)
+# If argument 'variables' is NULL, all variables from slot 'pramVars' will be used if possible.
+
+pram_2@origData %>%
+  group_by(LU1_unemployed) %>%
+  count()
+
+# PRAM count 
+pram_2@manipPramVars %>%
+  group_by(LU1_unemployed) %>%
+  count()
+
+# What happens ?
+table(
+  pram_2@manipPramVars$LU1_unemployed,
+  pram_2@origData$LU1_unemployed
+  )
+
+```
+
+Which parameters has been used by default ?
+```{r}
+
+sdcInitial@pram
+pram_2@pram
+
+# P Matrix
+pram_2@pram$params$LU1_unemployed$Rs
+
+# Transitions
+pram_2@pram$transitions$LU1_unemployed
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Test on 2014
+```{r}
+# https://www.armstat.am/en/?nid=212
+download.file(
+  destfile = "data/lfs_micro_arm_2014.7z",
+  url = "https://www.armstat.am/file/doc/99495978.7z"
+)
+
+archive::archive_extract("data/lfs_micro_arm_2014.7z",dir = "data/")
+# To read it 
+lfs_micro_arm_2014 <- haven::read_spss("data/LFS_Micro data 2014.sav")
+lfs_micro_arm_2014 %>% group_by(D15) %>% count()
+# few answer.. again
+```
+
+
+###To DO
+- strata -> double matirices possible ?
 - Regarder SUDA 
 - Test données synthétiques
-- Définition des variables sensibles
-- Définition des variables quasi-identifiantes dans les clefs
-- Test pram
-- Test données syntéthiques
 

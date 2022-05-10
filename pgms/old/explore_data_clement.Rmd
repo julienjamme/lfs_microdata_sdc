@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r, echo = FALSE}
-packs <- c("xlsx","haven","dplyr","ggraph","igraph","tidyr","tidygraph","visNetwork","stringr","data.table","flextable","magrittr","gridExtra","sdcMicro")
+packs <- c("xlsx","dplyr","sdcMicro","archive")
 
 p <- sapply(packs, install.packages)
 p <- lapply(packs,function(p) suppressPackageStartupMessages(library(p,character.only = TRUE)))
@@ -24,9 +24,16 @@ rm(p)
 # rm(list=ls())
 ```
 
-Build houshold ID :
+Download data :
 
 ```{r}
+download.file(
+  destfile = "data/lfs_micro_arm_2020.7z",
+  url = "https://www.armstat.am/file/doc/99528268.7z"
+)
+archive::archive_extract("data/lfs_micro_arm_2020.7z",dir = "data/")
+# To read it 
+lfs_micro_arm_2020 <- haven::read_spss("data/LFS_2020_2020 Dataset_Residents.sav")
 
 lfs_micro_arm_2020 <-
   lfs_micro_arm_2020 %>% 
@@ -83,6 +90,23 @@ colnames(lfs_micro_arm_2020)
 
 ```
 
+
+
+### Test on 2014
+```{r}
+# https://www.armstat.am/en/?nid=212
+download.file(
+  destfile = "data/lfs_micro_arm_2014.7z",
+  url = "https://www.armstat.am/file/doc/99495978.7z"
+)
+
+archive::archive_extract("data/lfs_micro_arm_2014.7z",dir = "data/")
+# To read it 
+lfs_micro_arm_2014 <- haven::read_spss("data/LFS_Micro data 2014.sav")
+lfs_micro_arm_2014 %>% group_by(D15) %>% count()
+# few answer.. again
+```
+
 ###To DO
 
 - Test PRAM sur des variables sensibles, de long en large -> En profiter pour les mesures de perte d'information
@@ -90,6 +114,5 @@ colnames(lfs_micro_arm_2020)
 - Test données synthétiques
 - Définition des variables sensibles
 - Définition des variables quasi-identifiantes dans les clefs
-- Test pram
 - Test données syntéthiques
 
