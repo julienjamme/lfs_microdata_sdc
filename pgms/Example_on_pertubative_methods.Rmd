@@ -1,0 +1,95 @@
+---
+title: "Data exploration of LFS armenian data"
+author: "MS4"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: tactile #cayman
+    highlight: github
+    toc: true
+    toc_depth: 5
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo = FALSE}
+packs <- c("xlsx","dplyr","sdcMicro","archive")
+
+p <- sapply(packs, install.packages)
+p <- lapply(packs,function(p) suppressPackageStartupMessages(library(p,character.only = TRUE)))
+rm(p)
+# rm(list=ls())
+```
+
+### Preparing data :
+
+```{r}
+
+download.file(
+  destfile = "data/lfs_micro_arm_2020.7z",
+  url = "https://www.armstat.am/file/doc/99528268.7z"
+)
+archive::archive_extract("data/lfs_micro_arm_2020.7z",dir = "data/")
+# To read it 
+lfs_micro_arm_2020 <- haven::read_spss("data/LFS_2020_2020 Dataset_Residents.sav")
+
+lfs_micro_arm_2020 <-
+  lfs_micro_arm_2020 %>% 
+  mutate(
+    id_hh = substr(IDmem,1,nchar(IDmem)-2), # concatenation of month + questionnaire_num
+    id_indiv = substr(IDmem,nchar(IDmem)-1,nchar(IDmem))
+  ) 
+
+```
+
+Household identification :
+
+A6_month : month of survey
+A1 : questionnaire number
+
+Quasi-identifying variables :
+
+- B5, B6 : Date of birth
+- B3 : Gender
+- A3 : Geographical Area (Marz)
+- B11 : Marital Status 
+- B7 : Diploma
+
+Sensitive variables 
+
+- E15 : Income
+- C2 : country of citizenship
+- LU1_unemployed : unemployment
+
+```{r}
+lfs_micro_subset <-
+  lfs_micro_arm_2020 %>%
+  select(id_hh,id_indiv,B5,B6,B3,A3,B11,B7,E15,C2,LU1_unemployed) %>% 
+  mutate(
+    dob = paste0(B5,"_",B6), # date of birth
+    LU1_unemployed = ifelse(is.na(LU1_unemployed),0,1) 
+         )
+```
+
+### Pram example :
+
+Prepare the sdc micro object
+```{r}
+
+
+
+```
+
+###To DO
+
+- Test PRAM sur des variables sensibles, de long en large -> En profiter pour les mesures de perte d'information
+- Regarder SUDA 
+- Test données synthétiques
+- Définition des variables sensibles
+- Définition des variables quasi-identifiantes dans les clefs
+- Test pram
+- Test données syntéthiques
+
