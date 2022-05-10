@@ -117,28 +117,96 @@ data_pram %>%
 
 ### Define the pram parameters  
 
+You can choose ypour matrix, be careful it is not invariant pram anymore, count are biased
 ```{r}
 
 
+mat <- matrix(c(0.3,0.7,0.2,0.8),nrow = 2,byrow = TRUE)
+row.names(mat) <- colnames(mat) <- levels(lfs_micro_subset$LU1_unemployed)
 
+
+pram <- pram(
+  lfs_micro_subset,
+  variables = "LU1_unemployed",
+  pd = mat,
+  alpha = NA
+)
+
+```
+
+Invariant Pram is automatically applied if only one coefficient is given for pd  (minimal diagonal value coefficient) (it can be seen as the level of utility we want to keep)
+
+The alpha parameters is linked to the invariant pram method see "The Analysis of Data Perturbed by PRAM
+A.D.L. van den Hout" and give also an idea of the level of pertubation we want to achieve. it lies between the 0,1 intervals, default value  is 0.5
+
+
+```{r}
+set.seed(12345)
+
+pram <- pram(
+  lfs_micro_subset,
+  variables = "LU1_unemployed",
+  pd = c(0.5), # can be a matrix or a minimal diagonal value
+  alpha = 0.2  # must lie between 0 and 1, its a parameter we can choose for invariant PRAM
+)
+
+
+attr(pram,"pram_params")
+
+
+pram <- pram(
+  lfs_micro_subset,
+  variables = "LU1_unemployed",
+  pd = c(0.5), # can be a matrix or a minimal diagonal value
+  alpha = 0.9  # must lie between 0 and 1, its a parameter we can choose for invariant PRAM
+)
+
+
+attr(pram,"pram_params")
+# pd = param in entry, RS, sresulting P matrix
 ```
 
 ### How to perform stratification ?
 
-regarder si on peut mettre 2 matrices différentes pour ces sous groupes ...
 ```{r}
-res_strata <- pram(
-  obj = lfs_micro_subset,
+set.seed(1234)
+pram <- pram(
+  lfs_micro_subset,
   variables = "LU1_unemployed",
-  strata_variables = c("B3")
-  )
+  pd = 0.4  # in order to apply PRAM independtly on the category of Gender ..
+)
 
-?pram
+pram2 <- pram(
+  lfs_micro_subset,
+  variables = "LU1_unemployed",
+  pd = 0.4,
+  strata_variables = "B3"  # in order to apply PRAM independtly on the category of Gender ..
+)
 
-attr(res_strata,"pram_params")
+# original count
+do.call(cbind,pram) %>%
+  as.data.frame() %>% 
+  group_by(B3,LU1_unemployed) %>% 
+  count()
+
+# count pram 1
+do.call(cbind,pram) %>%
+  as.data.frame() %>% 
+  group_by(B3,LU1_unemployed_pram) %>% 
+  count()
+
+# count pram 2
+do.call(cbind,pram2) %>%
+  as.data.frame() %>% 
+  group_by(B3,LU1_unemployed_pram) %>% 
+  count()
+
+attr(pram,"pram_params")
 ```
 
+
 ### How to measure the information loss ?
+One can calculate for eachcategory the quantity $P(X)$
 ```{r}
 
 
@@ -193,7 +261,6 @@ table(
   pram_2@manipPramVars$LU1_unemployed,
   pram_2@origData$LU1_unemployed
   )
-
 ```
 
 Which parameters has been used by default ?
@@ -219,27 +286,12 @@ pram_2@pram$transitions$LU1_unemployed
 
 
 
-
-
-
-### Test on 2014
-```{r}
-# https://www.armstat.am/en/?nid=212
-download.file(
-  destfile = "data/lfs_micro_arm_2014.7z",
-  url = "https://www.armstat.am/file/doc/99495978.7z"
-)
-
-archive::archive_extract("data/lfs_micro_arm_2014.7z",dir = "data/")
-# To read it 
-lfs_micro_arm_2014 <- haven::read_spss("data/LFS_Micro data 2014.sav")
-lfs_micro_arm_2014 %>% group_by(D15) %>% count()
-# few answer.. again
-```
-
-
 ###To DO
 - strata -> double matirices possible ?
 - Regarder SUDA 
 - Test données synthétiques
+
+
+
+
 
