@@ -1,0 +1,178 @@
+---
+title: "Synthdata"
+output: html_document
+date: '2022-05-11'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+packs <- c("xlsx","dplyr","tidyr","sdcMicro","archive","synthpop","ggplot2","simPop")
+p <- sapply(packs, install.packages)
+p <- lapply(packs,function(p) suppressPackageStartupMessages(library(p,character.only = TRUE)))
+rm(p)
+# rm(list=ls())
+```
+
+### Prepare data :
+
+```{r}
+
+download.file(
+  destfile = "data/lfs_micro_arm_2020.7z",
+  url = "https://www.armstat.am/file/doc/99528268.7z"
+)
+archive::archive_extract("data/lfs_micro_arm_2020.7z",dir = "data/")
+# To read it 
+lfs_micro_arm_2020 <- haven::read_spss("data/LFS_2020_2020 Dataset_Residents.sav")
+
+lfs_micro_arm_2020 <-
+  lfs_micro_arm_2020 %>% 
+  mutate(
+    id_hh = as.numeric(substr(IDmem,1,nchar(IDmem)-2)), # concatenation of month + questionnaire_num
+    id_indiv = substr(IDmem,nchar(IDmem)-1,nchar(IDmem))
+  ) 
+
+lfs_micro_subset <-
+  lfs_micro_arm_2020 %>%
+  select(id_hh,id_indiv,B5,B6,Age,B3,A3,B11,B7,E15,C2,LU1_unemployed,WeightsCalib_year) %>% 
+  mutate(
+    dob = paste0(B5,"_",B6), # date of birth
+    LU1_unemployed = as.factor(ifelse(is.na(LU1_unemployed),0,1)) 
+         ) %>% 
+  select(-B5,-B6)
+```
+
+### simPop
+
+```{r}
+
+set.seed(1234)
+lfs_micro_subset <-
+  lfs_micro_subset %>% 
+    left_join(
+      lfs_micro_subset %>% 
+        group_by(id_hh) %>% 
+        summarise(size = n()),
+      by ="id_hh"
+    )
+
+input <- specifyInput(
+                    lfs_micro_subset %>% mutate(
+                      A3 = as.factor(A3),
+                      Age = as.factor(Age),
+                      C2 = as.factor(C2)
+                      ),
+                    hhid = "id_hh", # household id
+                    hhsize = "size",# household size
+                    strata = "A3", # regions -> the models are computed for each strata
+                    weight = "WeightsCalib_year"
+                    ) # sampling weight
+
+str(input,2)
+attributes(inp)$data
+attr(input,"data")
+
+```
+
+
+Quasi-identifying variables :
+
+- B5, B6 : Date of birth
+- B3 : Gender
+- A3 : Geographical Area (Marz)
+- B11 : Marital Status 
+- B7 : Diploma
+
+Sensitive variables 
+
+- E15 : Income
+- C2 : country of citizenship
+- LU1_unemployed : unemployment
+
+
+1 st step, create a population with the same structure than the original one, on "basic variables"
+```{r}
+synthP <- simStructure(
+                       data = input, 
+                       method = "direct",
+                       basicHHvars = c("B3", "Age", "A3")
+                       )
+
+initdata <- synthP@sample@data # initial data (n indiv =sum of weight)
+genpop <- synthP@pop@data # the generated population
+
+# by size
+genpop %>%
+  group_by(size) %>%
+  count()
+
+initdata %>% 
+  group_by(size) %>% 
+  summarise(n = sum(WeightsCalib_year))
+
+# by Gender  x Age
+genpop %>% 
+  group_by(B3,Age) %>% 
+  count()
+
+initdata %>% 
+  group_by(B3,Age) %>% 
+  summarise(n = sum(WeightsCalib_year))
+```
+Step 2 : add categorica variables simulate by multinomial model
+```{r}
+synthP <- simCategorical(
+  synthP, 
+  additional = c("B11", "B7", "C2"),
+  method = "multinom",
+  nr_cpus = 4
+  )
+
+genpop <- synthP@pop@data
+
+# Marital Status
+genpop %>% 
+  group_by(B11) %>% 
+  count()
+
+initdata %>% 
+  group_by(B11) %>% 
+  summarise(n = sum(WeightsCalib_year))
+
+# Diploma
+genpop %>% 
+  group_by(B7) %>% 
+  count()
+
+initdata %>% 
+  group_by(B7) %>% 
+  summarise(n = sum(WeightsCalib_year))
+
+# citizenship
+genpop %>% 
+  group_by(C2) %>% 
+  count()
+
+initdata %>% 
+  group_by(C2) %>% 
+  summarise(n = sum(WeightsCalib_year))
+
+# SimRelation function permit to take into account the fact that peple leave in the same household => no infepedance
+```
+
+### How to measure information loss ?
+
+```{r}
+tab <- spTable(synthP,select = c("B3","A3")) # cal
+str(tab,2) # calculate the expected cross tabulation an the created incross tabulation ion synthpop 
+
+spMosaic(tab, labeling = labeling_border(abbreviate = c(A3 = TRUE)))
+
+```
+```{r}
+spCdfplot(synthP,"Age",cond = "B3", layout = c(1,2))
+
+```
