@@ -1,0 +1,318 @@
+---
+title: "Example on how to use recordSwapping package to apply TRS"
+author: "Insee"
+date: '2022-05-19'
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: true
+    number_section: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/home/rstudio/lfs_microdata_sdc")
+```
+
+# Preparations
+
+## `recordSwapping` package Download
+
+```{r eval = FALSE}
+devtools::install_github(
+  "sdcTools/recordSwapping",
+  force=TRUE
+)
+```
+
+## Data
+
+```{r message=FALSE}
+library(dplyr)
+```
+
+
+```{r}
+lfs_micro_arm_2020 <- haven::read_spss(
+  "data/LFS_2020_2020 Dataset_Residents.sav"
+) %>%
+  mutate(
+    #Date of Birth
+    DOB = paste(B5,B6,sep="_"),
+    # ID of households
+    IDHH = as.integer(substr(IDmem,1,nchar(IDmem)-2)),
+    # Age in 9 categories
+    AGE = cut(
+      (2020-as.numeric(B6)),
+      breaks = c(seq(0,80,10),110),
+      right=FALSE, 
+      ordered_result = TRUE
+    )
+  ) %>%
+  # Size of Households
+  group_by(IDHH) %>%
+  mutate(
+    HH_SIZE = n()
+  ) %>% 
+  ungroup() 
+```
+
+```{r}
+lfs_micro_arm_2020 %>%
+  select(IDHH, AGE, B3, B11, HH_SIZE, A3, A5) %>% 
+  slice_sample(n=1000) %>%
+  DT::datatable()
+```
+
+
+On the released data, we computed a categorical variable of AGE to get a 4-anonymized file if we consider AGE, A3, A5 (geo areas) 
+and B3 (Gender) as key variables. 
+
+In this work, the swapping will happen between Marz, so we will remove the geo variables from the original keys, and we choose to work with the marital status (B11), the diploma and Place of Birth variables in addition of gender and age.
+
+```{r}
+key_variables <- c("B3", "AGE", "B11")
+```
+
+
+```{r}
+lfs_micro_arm_2020 %>%
+  group_by(across(all_of(c("A3", key_variables)))) %>%
+  mutate(fk = n()) %>%
+  ungroup() %>%
+  group_by(fk) %>%
+  summarise(
+    n = n(),
+    share = n/nrow(lfs_micro_arm_2020)*100,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    n_cum = cumsum(n), 
+    share_cum = cumsum(share)
+  ) %>%
+  DT::datatable(caption = "number of individuals according to the frequency of the combination of key variables to which they belong.")
+```
+
+We can notice that with these new keys, the file is actually 1-anonymized.
+We could maybe think about some recoding. But, here, we choose to apply TRS to protect the microdata file.
+
+# Apply Target Record Swapping
+
+```{r message = FALSE}
+library(recordSwapping)
+```
+
+## Settings
+
+### Risk level
+
+`recordSwapping::recordSwap()` will swap the households that are considered of high risk. The risk measure available is k-anonymity. If we choose k = 3, the function will ensure that at least all households whose key combination is less frequent than k = 3 in the dataset will be swapped with non risky households.
+
+```{r}
+k_anonymity_level <- 3
+```
+
+```{r}
+lfs_micro_arm_2020 <- lfs_micro_arm_2020 %>%
+  group_by(across(c("A3", key_variables))) %>%
+  mutate(fk = n()) %>%
+  mutate(is_risky_indiv = fk < k_anonymity_level) %>%
+  group_by(IDHH) %>%
+  mutate(is_risky_hh = sum(is_risky_indiv) > 0) %>%
+  ungroup()
+```
+
+
+```{r}
+lfs_micro_arm_2020 %>%
+  select(IDHH, is_risky_hh, is_risky_indiv) %>%
+  arrange(IDHH) %>%
+  slice(1:1000) %>%
+  DT::datatable()
+
+nb_risky_households <- lfs_micro_arm_2020 %>% 
+  filter(is_risky_indiv) %>%
+  nrow()
+
+nb_risky_households
+nb_risky_households/length(unique(lfs_micro_arm_2020$IDHH))
+```
+
+With k set to 3, we get 153 risky households (households who contains at list one risky individual), that is 1.97% of risky households.
+
+### Swap rate
+
+The swap rate is the rate of households to swap. If the swap rate is greater 
+than the rate of risky households in the sense of k-anonymity, then `recordSwap()` will swap all the risky households and some non risky households
+to get this swap rate. If the indicated swap rate is lower, only risky households will be swapped.
+
+Here, we choose to set it at 5% : a few non risky households will be the swapped. 
+
+```{r}
+swap_rate <- 0.05
+```
+
+### geographical areas
+
+We often meet several geographical variables that are linked in a hierarchical manner. For example, we have a Province variable, and in each Province there 
+are several districts. In that case, we have to mention all these variables 
+in the hierarchy argument of the `recordSwap()` function.
+
+In the Armenian LFS microdata there is not such hierarchical links. So we mention only the Marz variable within the hierarchy argument.
+
+```{r}
+geo_hierarchical_var <- c("A3")
+```
+
+
+### Similar variables
+
+The similar variables are the variables that will be useful for the algorithm to choose with which non risky household the risky household will be swapped.
+
+A similar variable is necessarily a variable that is relevant at the household level. Here, we will choose the size of hoseholds. That is to say, the function will swap the risky household with a non risky one of the same size.
+
+```{r}
+similar_var <- "HH_SIZE"
+```
+
+### Carry along variables
+
+The carry along variables are variables that will be swapped between the two households, but they don't participate during the choice of the donors.
+
+It's, in general, some geographical variables that are not concerned by the hierarchy but that have to be swapped to keep the relevancy of geo information.
+For example, we want to keep the information of Urban/Rural area. 
+
+In this case, we could have considered this variable as a similar variable to swap only rural hh with rural hh and urban with urban. The choice made here could lead to swap urban hh with rural hh, but we will swap Marz and Urban/Rural info together.
+
+```{r}
+carry_along_var <- "A5"
+```
+
+### Set a seed for reproducibility of the work
+
+```{r}
+seed <- 21081789
+```
+
+## Run the swapping
+
+### Last preparation of data
+
+Before running the function, we have to ensure that ID of households, geographical variables in the hierarchy, the similar variable and the carry along variables are integer values.
+
+```{r}
+lfs_prep <- lfs_micro_arm_2020 %>%
+  mutate(
+    across(
+      all_of(
+        c("IDHH", geo_hierarchical_var, similar_var, carry_along_var, key_variables)
+      ),
+      as.integer
+    )
+  ) %>%
+  # The NA is set to 99 : recordSwap needs integer
+  mutate(
+    across(
+      all_of(c("B11", "B7", "C1")),
+      ~ifelse(is.na(.x), 99, .x)
+    )
+  )
+```
+
+### Run
+
+```{r}
+lfs_swapped <- recordSwap(
+  data = lfs_prep,
+  # ID of households
+  hid = "IDHH", 
+  # Geographical hierachy
+  hierarchy = geo_hierarchical_var,
+  similar = similar_var,
+  risk_variables = key_variables,
+  k_anonymity = k_anonymity_level,
+  swaprate = swap_rate,
+  return_swapped_id = TRUE,
+  seed = seed
+)
+```
+
+### Results
+
+```{r}
+var_of_interest <- c(
+  "IDHH","IDHH_swapped",
+  geo_hierarchical_var, similar_var, carry_along_var, key_variables,
+  "C2", "is_risky_indiv", "is_risky_hh"
+)
+```
+
+
+Number of households which have been swapped :
+
+```{r}
+all_swapped_hh <- lfs_swapped %>% 
+  select(all_of(var_of_interest)) %>%
+  filter(IDHH != IDHH_swapped) %>%
+  pull(IDHH) %>%
+  unique()
+
+length(all_swapped_hh)
+```
+
+Share of swapped HH :
+
+```{r}
+length(all_swapped_hh)/length(unique(lfs_prep$IDHH)) * 100
+```
+
+Are all my risky households have been swapped ?
+
+```{r}
+lfs_swapped %>% 
+  select(all_of(var_of_interest)) %>%
+  filter(is_risky_hh) %>%
+  mutate(is_swapped = IDHH != IDHH_swapped) %>%
+  select(IDHH, A3, HH_SIZE, is_swapped) %>%
+  unique() %>%
+  count(is_swapped)
+```
+
+All Risky HH have been swapped.
+
+Counts in each Province
+
+Swapped HH by Marz
+
+```{r}
+lfs_swapped %>%
+  mutate(is_swapped = IDHH != IDHH_swapped) %>%
+  group_by(A3, is_swapped) %>%
+  count() %>%
+  group_by(A3) %>%
+  mutate(share_swap = n/sum(n)*100) %>%
+  filter(is_swapped) %>%
+  knitr::kable()
+```
+
+
+Gender by Marz :
+
+```{r}
+lfs_prep %>%
+  group_by(A3, B3) %>%
+  count() %>%
+  full_join(
+    lfs_swapped %>%
+      group_by(A3, B3) %>%
+      count(),
+    by = c("A3","B3"),
+    suffix = c("_orig","_swap")
+  ) %>%
+  knitr::kable()
+```
+
+
+
+
