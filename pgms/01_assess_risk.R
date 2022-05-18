@@ -8,8 +8,15 @@ library(ggplot2)
 lfs_micro_arm_2020 <- lfs_micro_arm_2020 %>%
   mutate(
     DOB = paste(B5,B6,sep="_"),
-    IDHH = substr(IDmem,1,nchar(IDmem)-2)
+    IDHH = as.numeric(substr(IDmem,1,nchar(IDmem)-2))
+  ) %>%
+  mutate(
+    AGE = cut((2020-as.numeric(B6)), breaks = seq(0,110,10),right=FALSE, ordered_result = TRUE)
   )
+
+ggplot(lfs_micro_arm_2020) +
+  geom_bar(aes(x=AGE))
+#Maybe the last two or last three or last four categories could be grouped together
 
 # Set key variables (individual level)
 # first attempt with gender, date of birth and geographical area variables as keys
@@ -21,18 +28,38 @@ key_variables_arm <- c(
   # ,'B7' # Diploma
 )
 
+key_variables_arm_alter <- c(
+  'B3' # Gender
+  ,'AGE' # 10 categories of AGE
+  ,'A3','A5' # Geographical area (Province, Urban/Rural)
+  # ,'B11' #Marital Status
+  # ,'B7' # Diploma
+)
+
+compute_number_of_actual_keys <- function(data, keys_var){
+  data %>%
+    group_by(across(all_of(keys_var))) %>%
+    count() %>%
+    nrow()
+}
+
+compute_number_of_actual_keys(lfs_micro_arm_2020, key_variables_arm)
+# With B3, DOB A3 and A5 key variables, there are 18508 actual combinations.
+# This amount is due to the very detailed variable of age.
+
+compute_number_of_actual_keys(lfs_micro_arm_2020, key_variables_arm_alter)
+#Only 414 keys in this case
+
 lfs_arm_sdc_object <- createSdcObj(
   dat=lfs_micro_arm_2020,
   keyVars=key_variables_arm,
-  hhId = IDHH,
+  hhId = "IDHH", #Has to be an integer variable
   weightVar="WeightsCalib_year",
   seed = 20061789
 )
 
 # k-anonymity with sdcMicro
 print(lfs_arm_sdc_object) #by default print for k = 2 or 3
-#other way to get the number of risky cells for any threshold of k-anonymity
-kAnon(lfs_arm_sdc_object, k = 10)
 
 lfs_arm_indiv_risks <- lfs_arm_sdc_object@risk$individual %>%
   as_tibble()
@@ -56,10 +83,26 @@ kano <- function(sdcObj, k){
 kano_vect <- Vectorize(kano, "k", USE.NAMES = TRUE)
 kano_vect(lfs_arm_sdc_object, setNames(2:5,2:5))
 
-# Problematic combinations of key variables (fk == 1)
+# SAMPLE UNIQUES in the original data
 lfs_micro_arm_2020 %>% 
   filter(lfs_arm_indiv_risks$fk < 2) %>%
-  select(key_variables_arm)
+  select(all_of(key_variables_arm), WeightsCalib_year, AGE) %>%
+  arrange(WeightsCalib_year) %>%
+  mutate(
+    rk = 1/WeightsCalib_year
+  ) %>%
+  View()
+
+
+# Example of l-diversity assessment
+# Computing l-diversity
+
+lfs_arm_sdc_object <- ldiversity(obj = lfs_arm_sdc_object, ldiv_index = c("E15"), l_recurs_c = 2, missing = NA)
+# Output for l-diversity
+lfs_arm_sdc_object@risk$ldiversity
+# l-diversity score for each record
+lfs_arm_sdc_object@risk$ldiversity[,'E15_Distinct_Ldiversity']
+
 
 # The Risk measure proposed by sdcMicro
 # A low frequency count in the sample is problematic because if we know that the 

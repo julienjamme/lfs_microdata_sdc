@@ -3,10 +3,10 @@
 
 # Downloading required packages ####
 
-packs <- c("archive","sdcMicro","data.table","dplyr","haven")
+packs <- c("archive","sdcMicro","data.table","haven")
 p <- sapply(packs, install.packages)
 
-
+if(!dir.exists("data")) dir.create("data")
 
 # Downloading data ####
 
