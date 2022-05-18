@@ -1,0 +1,54 @@
+---
+title: "TRS"
+author: "MS4"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: tactile #cayman
+    highlight: github
+    toc: true
+    toc_depth: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo = FALSE}
+packs <- c("xlsx","dplyr","tidyr","sdcMicro","archive","ggplot2")
+p <- sapply(packs, install.packages)
+p <- lapply(packs,function(p) suppressPackageStartupMessages(library(p,character.only = TRUE)))
+rm(p)
+install.packages("remotes")
+remotes::install_github("sdcTools/recordSwapping")
+# rm(list=ls())
+```
+```{r}
+# getwd()
+download.file(
+  destfile = "data/lfs_micro_arm_2020.7z",
+  url = "https://www.armstat.am/file/doc/99528268.7z"
+)
+archive::archive_extract("data/lfs_micro_arm_2020.7z",dir = "data/")
+# To read it 
+lfs_micro_arm_2020 <- haven::read_spss("data/LFS_2020_2020 Dataset_Residents.sav")
+
+lfs_micro_arm_2020 <-
+  lfs_micro_arm_2020 %>% 
+  mutate(
+    id_hh = as.numeric(substr(IDmem,1,nchar(IDmem)-2)), # concatenation of month + questionnaire_num
+    id_indiv = substr(IDmem,nchar(IDmem)-1,nchar(IDmem))
+  ) 
+```
+
+```{r}
+# git clone https://github.com/sdcTools/recordSwapping.git for the vignettes
+# E8 type de revenu
+lfs_micro_arm_2020 %>% 
+  select(E8_a,E8_b,E8_c,E8_d,E8_e,E8_f,E8_g,E8_h,E8_i,E14_1,E14_2,E15) %>% 
+  mutate(test = !is.na(E14_1) | !is.na(E15)) %>% 
+  filter(test)
+# for pram build a categorization of wage and then perform pram on this method
+# caluclate the coefficients with pkk etc..
+```
