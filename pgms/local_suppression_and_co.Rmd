@@ -1,0 +1,161 @@
+---
+title: "Example on SDC Micro"
+author: "MS4"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: tactile #cayman
+    highlight: github
+    toc: true
+    toc_depth: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo = FALSE}
+packs <- c("xlsx","dplyr","tidyr","sdcMicro","archive","ggplot2")
+p <- sapply(packs, install.packages)
+p <- lapply(packs,function(p) suppressPackageStartupMessages(library(p,character.only = TRUE)))
+rm(p)
+# rm(list=ls())
+```
+
+ 1) Local Suppression
+ 2) SUDA algorithm
+ 3) micro agregation
+ 4) synthetic data
+ 
+## Local suppression
+
+### A small example:
+
+#### Build data:
+```{r}
+id <- seq(1,7)
+gender <- c("female","male","male","male","female","female","female")
+region <- rep("rural",7)
+education <- c(rep("higher",4), rep("lower",3))
+
+example_data <- data.frame(
+  id = id,
+  gender = gender,
+  region = region,
+  education = education
+  )
+
+example_data
+```
+In the example, the key define by :
+gender = female, region = rural, education = higher is unique.
+
+The data are 1-anonymised which mean not sufficiently protected. Variables can't be recoded more here (only 2 categories by variables). That is why local Suppression is relevant here. In order to reach a 3-anonymised data, we will the localSuppression algorithm in order to suppress only one value in order to avoid sample uniqueness in our case, but it can be used also in order to reach a k-anonymisation threshold.
+
+#### Prepare the SDC micro object:
+
+Here the SDC micro object is necessary in order to apply Local Suppression.
+we have to pack the data into a special object from SdcMicro package before applying the Local suppression algorithm.
+
+```{r}
+# Define the list of key variables
+KeyVars = c("gender","region","education")
+
+sdcInitial <- createSdcObj(
+  dat = example_data,
+  keyVars = KeyVars
+)
+
+print(sdcInitial)
+
+```
+
+#### Apply Local Suppression
+
+Local suppression, take as parameter:
+- The sdcMicro object created before 
+- The k-anonymisation threshold we want to reach
+
+```{r}
+sdc_ls <- localSuppression(sdcInitial, k = 3)
+
+str(sdc_ls,2)
+
+# in order to have information on the result of local suppression:
+sdc_ls@localSuppression 
+
+# original data
+sdc_ls@origData
+
+# new data
+sdc_ls@manipKeyVars
+
+
+```
+#### Importance vector 
+
+It is possible to define priority between variables with the "importance" parameters. Each element of the importance parameter define the importance of each variable in the local suppression process. The higher the value, the higher the probability that the values of the concerned variable will be suppress.
+
+In the example importance  = c(3,2,1),  means Gender will be prioritized during suppression.
+
+Depending on the situation, this prioritization of variables can be very useful. For example, if we want to deliver accurate information about the general level of education, we would prefer to suppress the values of the variables region or gender instead. 
+
+```{r}
+sdc_ls_2 <- localSuppression(sdcInitial, importance = c(3, 2, 1), k = 3)
+
+# original data
+sdc_ls_2@origData
+
+# new data
+sdc_ls_2@manipKeyVars
+
+```
+
+
+### Local Suppression on lfs armstat
+
+#### Loading data
+```{r}
+# getwd()
+download.file(
+  destfile = "data/lfs_micro_arm_2020.7z",
+  url = "https://www.armstat.am/file/doc/99528268.7z"
+)
+archive::archive_extract("data/lfs_micro_arm_2020.7z",dir = "data/")
+# To read it 
+lfs_micro_arm_2020 <- haven::read_spss("data/LFS_2020_2020 Dataset_Residents.sav")
+
+lfs_micro_arm_2020 <-
+  lfs_micro_arm_2020 %>% 
+  mutate(
+    id_hh = as.numeric(substr(IDmem,1,nchar(IDmem)-2)), # concatenation of month + questionnaire_num
+    id_indiv = substr(IDmem,nchar(IDmem)-1,nchar(IDmem))
+  ) 
+
+# Recoding age for the example
+lfs_micro_arm_2020 <- lfs_micro_arm_2020 %>%
+  mutate(
+    DOB = paste(B5,B6,sep="_"),
+    IDHH = as.numeric(substr(IDmem,1,nchar(IDmem)-2))
+  ) %>%
+  mutate(
+    AGE = cut((2020-as.numeric(B6)), breaks = seq(0,110,10),right=FALSE, ordered_result = TRUE)
+  )
+
+```
+
+
+
+```{r}
+
+
+# git clone https://github.com/sdcTools/recordSwapping.git for the vignettes
+# E8 type de revenu
+lfs_micro_arm_2020 %>% 
+  select(E8_a,E8_b,E8_c,E8_d,E8_e,E8_f,E8_g,E8_h,E8_i,E14_1,E14_2,E15) %>% 
+  mutate(test = !is.na(E14_1) | !is.na(E15)) %>% 
+  filter(test)
+# for pram build a categorization of wage and then perform pram on this method
+# caluclate the coefficients with pkk etc..
+```
