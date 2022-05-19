@@ -123,6 +123,7 @@ lfs_micro_fr_2020 %>%
 lfs_micro_arm_2020 %>%
   group_by(E15) %>%
   count()
+# A lot of NA => how to explain that?
 
 lfs_micro_arm_2020 %>%
   group_by(C2) %>%
