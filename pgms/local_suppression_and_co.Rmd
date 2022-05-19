@@ -162,7 +162,7 @@ lfs_micro_arm_2020 %>%
 
 ```
 
-The first keys in the list above are for a single individual.  We will suppose here that we want to obtain a file where all the crossings are populated with at least 2 persons (2 anonymized)
+The first keys in the list above are for a single individual.  We will suppose here that we want to obtain a file where all the crossings are populated with at least 3 persons (3 anonymized)
 
 #### Create the SdcMicro object
 
@@ -181,20 +181,58 @@ print(sdcInitial)
 #### Apply Local Suppression
 ```{r}
 
-sdc_ls <- localSuppression(sdcInitial, k = 2)
-
-str(sdc_ls,2)
+sdc_ls <- localSuppression(sdcInitial, k = 3)
 
 # in order to have information on the result of local suppression:
 sdc_ls@localSuppression 
 
 # original data
-sdc_ls@origData
+sdc_ls@origData %>% 
+  group_by(B3,AGE_top,A3,B11) %>% 
+  count() %>% 
+  arrange(n)
 
 # new data
-sdc_ls@manipKeyVars
+sdc_ls@manipKeyVars %>% 
+  group_by(B3,AGE_top,A3,B11) %>% 
+  count() %>% 
+  arrange(n)
+
+```
+
+Attention! It may seem at first sight that keys with less individuals than the defined threshold (here k = 3) still exist.
+In fact it is not the case because it is necessary to consider the individuals in the keys with missing values (following the local deletion) as potential individuals populating these keys.
 
 
+#### risk/ information loss trade-off:
 
+Here, we will apply the local suppression with several thresholds k <- 1: 10 and observe the percentage of suppressed values in the original data for each threshold. It allows us to represent the risk-information loss trade-off  
+```{r}
+
+count_number_suppression <- function(threshold){
+  # threshold <- 2
+  nvalue <- 5*nrow(lfs_micro_arm_2020) # total number of values
+  sdc_ls <- localSuppression(sdcInitial, k = threshold)
+  
+  number_suppression <- sdc_ls@localSuppression$totalSupps %>% sum()
+  
+  return(number_suppression/nvalue) # pct of suppress values 
+}
+
+```
+
+```{r}
+vector_threshold <- seq(2,15)
+vector_pct_suppression <- sapply(vector_threshold,count_number_suppression)
+
+data_frame(
+  k = vector_threshold,
+  pct_sup = vector_pct_suppression,
+  inv_k = 1/vector_threshold) %>% 
+  ggplot()+
+  geom_point(mapping = aes(x = pct_sup , y = inv_k), col ="red")+
+  xlab("Percentage of suppressed values")+
+  ylab("1 / k")+
+  ggtitle("trade-off risk Information loss with local suppression")
 
 ```
