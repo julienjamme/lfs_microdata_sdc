@@ -1,0 +1,87 @@
+---
+title: "micro agregation example"
+output: html_document
+date: '2022-05-19'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+packs <- c("xlsx","dplyr","tidyr","sdcMicro","archive","ggplot2")
+p <- sapply(packs, install.packages)
+p <- lapply(packs,function(p) suppressPackageStartupMessages(library(p,character.only = TRUE)))
+rm(p)
+# rm(list=ls())
+```
+
+```{r}
+# getwd()
+download.file(
+  destfile = "data/lfs_micro_arm_2020.7z",
+  url = "https://www.armstat.am/file/doc/99528268.7z"
+)
+
+archive::archive_extract("data/lfs_micro_arm_2020.7z",dir = "data/")
+# To read it 
+lfs_micro_arm_2020 <- haven::read_spss("data/LFS_2020_2020 Dataset_Residents.sav")
+```
+
+```{r}
+
+lfs_micro_arm_2020_E14 <- lfs_micro_arm_2020 %>%
+  mutate(
+    IDHH = as.numeric(substr(IDmem,1,nchar(IDmem)-2))
+  ) %>%
+  mutate(
+    AGE_top = cut(
+      (2020-as.numeric(B6)),  
+      breaks = c(seq(0,80,10),110),
+      right=FALSE, ordered_result = TRUE)
+  ) %>% 
+  filter(!is.na(E14_1)) %>% 
+  select(IDmem,IDHH,B3,AGE_top,A3,B11,E14_1,WeightsCalib_year)
+ 
+lfs_micro_arm_2020_E14 %>% head(5)
+```
+
+```{r}
+KeyVars = c("B3" ,"AGE_top", "A3", "B11")
+
+sdcInitial <- createSdcObj(
+  dat = lfs_micro_arm_2020_E14,
+  keyVars = KeyVars,
+  numVars = "E14_1",
+  weightVar = "WeightsCalib_year",
+)
+
+
+```
+
+```{r}
+
+sdc_micro_ag <- microaggregation(
+                               obj = sdcInitial,
+                               aggr = 10, 
+                               variables = c("E14_1"),
+                               method = 'mdav', 
+                               measure = "mean"
+                               )
+
+
+```
+
+```{r}
+
+str(sdcInitial,2)
+
+
+bind_cols(
+  lfs_micro_arm_2020_E14$E14_1,
+  sdc_micro_ag@manipNumVars$E14_1
+)
+
+
+
+```
