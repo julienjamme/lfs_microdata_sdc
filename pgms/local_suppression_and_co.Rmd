@@ -1,5 +1,5 @@
 ---
-title: "Example on SDC Micro"
+title: "Local Suppression"
 author: "MS4"
 date: "`r Sys.Date()`"
 output:
@@ -23,11 +23,7 @@ rm(p)
 # rm(list=ls())
 ```
 
- 1) Local Suppression
- 2) SUDA algorithm
- 3) micro agregation
- 4) synthetic data
- 
+
 ## Local suppression
 
 ### A small example:
